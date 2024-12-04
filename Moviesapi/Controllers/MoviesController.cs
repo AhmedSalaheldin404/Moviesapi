@@ -22,10 +22,35 @@ namespace Moviesapi.Controllers
         }
         //add movie
 
+        [HttpGet]
+        public async Task<IActionResult> GetallCreateAsync()
+        {
+            var movies =  await _context.Movies.Include(g=>g.Genre).ToListAsync();
+            return Ok(movies);
+
+        }
+        [HttpGet("id")] //بجبر اليوزر يدخل id + عشان اتجنب ايرور ان مينفعش يكون عندي اتنين اند بوينت بنفس الوظيفه
+        public async Task<IActionResult> GetById(int id)
+        {
+            var movie = await _context.Movies.FindAsync(id);
+            if (movie == null)
+                return BadRequest("not found");
+
+            return Ok(movie);
+        }
+        [HttpGet("getgenreid")]
+        public async Task<IActionResult>GetByGenreId(byte genid)
+        {
+            var movies = await _context.Movies.Where(m=>m.GenreId==genid)
+                .OrderByDescending(x=>x.rate).Include(g => g.Genre).ToListAsync();
+            return Ok(movies);
+        }
         [HttpPost]
         public async Task<IActionResult>CreateAsync([FromForm]Moviedtos dto)
 
         {
+            if (dto.Poster == null)
+                return BadRequest("poster is required!");
             if (!_allowedextenstions.Contains(Path.GetExtension(dto.Poster.FileName).ToLower()))
                 return BadRequest("only png and jpg are allowed!"); // بشيك ان المسار الي في البوستر مش بيحتوي علي jpg or png
             if (dto.Poster.Length > _maxallowedpostersize)
@@ -48,6 +73,49 @@ namespace Moviesapi.Controllers
             _context.SaveChanges();
             return Ok(movie);
         }
+        [HttpPut("{id}")]
+        public async Task<IActionResult> Updateasync(int id, [FromForm] Moviedtos dto)
+        {
+            
+            if (dto.Poster.Length > _maxallowedpostersize)
+                return BadRequest("you can't exceed the maximum size for as it is 1MB"); //بشيك لو حجم الصوره اكبر من الي انا عاوزه
+            var movie = await _context.Movies.FindAsync(id);
+            if (movie == null) return NotFound($"no movie was found with {id}");
+            var isvaildgenre=await _context.Genres.AnyAsync(g=>g.Id==dto.GenreId);
+            if (!isvaildgenre)
+                return BadRequest("invalid genre id");
+            if (dto.Poster != null) {
+                if (!_allowedextenstions.Contains(Path.GetExtension(dto.Poster.FileName).ToLower()))
+                    return BadRequest("only png and jpg are allowed!");
 
+                if (dto.Poster.Length > _maxallowedpostersize)
+                    return BadRequest("max allowed size is not 1 mb");
+                using var datastream=new MemoryStream();
+                await dto.Poster.CopyToAsync(datastream);
+                movie.Poster=datastream.ToArray();
+            }
+            movie.Title = dto.Title;
+            movie.Storyline = dto.Storyline;
+            movie.rate = dto.rate;  
+            movie.year = dto.year;
+            movie.GenreId = dto.GenreId;
+
+            _context.SaveChanges();
+            return Ok(movie);   
+        }
+
+
+        [HttpDelete("{id}")]
+        public async Task<IActionResult>Deleteasync(int id)
+        {
+            var movie = await _context.Movies.FindAsync(id);
+            if (movie == null) return NotFound($"no movie was found with that {id}");
+
+            _context.Remove(movie);
+            _context.SaveChanges();
+            return Ok(movie);
+        }
     }
+  
+
 }

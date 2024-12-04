@@ -8,5 +8,6 @@ namespace Moviesapi.Models
 
 
         }
+        public DbSet<Genre> Genres {  get; set; }
     }
 }
